@@ -1,5 +1,6 @@
 package com.craftinginterpreters.lox;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static com.craftinginterpreters.lox.TokenType.*;
@@ -17,17 +18,93 @@ class Parser {
         this.tokens = tokens;
     }
 
-    Expr parse() {
+
+    List<Stmt> parse() {
+        List<Stmt> statements = new ArrayList<>();
+        while (!isAtEnd()) { //iterates through all expressions
+            statements.add(declaration()); //program is made of declerations grammatically
+        }
+
+        return statements;
+    }
+
+    private Stmt statement() {
+        if (match(PRINT)) return printStatement(); //statements starting with a print token are print statements
+        if (match(LEFT_BRACE)) return new Stmt.Block(block()); //statements starting with { are a block statements
+
+        return expressionStatement(); //if token does not match any kind of  statement, assume it is an expression statement
+    }
+
+    private List<Stmt> block() {
+        List<Stmt> statements = new ArrayList<>();
+
+        while (!check(RIGHT_BRACE) && !isAtEnd()) {
+            statements.add(declaration()); //parse statements and add them until the end of the block is reached ( } ).
+        }
+
+        consume(RIGHT_BRACE, "Expect '}' after block.");
+        return statements;
+    }
+
+    private Stmt printStatement() {
+        Expr value = expression(); //parse subsequent statement after PRINT
+        consume(SEMICOLON, "Expect ';' after value.");
+        return new Stmt.Print(value); //emit the syntax tree
+    }
+
+    private Stmt expressionStatement() {
+        Expr expr = expression(); //parse expression
+        consume(SEMICOLON, "Expect ';' after expression.");
+        return new Stmt.Expression(expr); //emit syntax tree
+    }
+
+
+    private Expr expression() { //expressions extend equality rule
+        return assignment();
+    }
+
+    private Expr assignment() {
+        Expr expr = equality();
+
+        if (match(EQUAL)) {
+            Token equals = previous();
+            Expr value = assignment(); //recursively call assignment to parse the right-hand side as if it were an expression
+
+            if (expr instanceof Expr.Variable) { //if a valid variable target is found we produce a syntax tree that turns the "expression" into an assignment target
+                Token name = ((Expr.Variable)expr).name;
+                return new Expr.Assign(name, value);
+            }
+
+            error(equals, "Invalid assignment target."); //don't throw as we don't need to synchronise due to this error
+        }
+
+        return expr;
+    }
+
+    //gramatically declerations are made of var decl., func decl, object decl and statements
+    private Stmt declaration() {
         try {
-            return expression(); //parses a single expression and returns it
+            if (match(VAR)) return varDeclaration();
+
+            return statement(); //if no keywords then falls through to statement
         } catch (ParseError error) {
+            synchronize();
             return null;
         }
     }
 
-    private Expr expression() { //expressions extend equality rule
-        return equality();
+    private Stmt varDeclaration() {
+        Token name = consume(IDENTIFIER, "Expect variable name.");
+
+        Expr initializer = null; // if no value specified the var is stored as null
+        if (match(EQUAL)) { //if value specified
+            initializer = expression(); //value stored as expression value
+        }
+
+        consume(SEMICOLON, "Expect ';' after variable declaration.");
+        return new Stmt.Var(name, initializer);
     }
+
 
     private Expr equality() {
         Expr expr = comparison(); //if no equality, comparison is called
@@ -155,6 +232,10 @@ class Parser {
 
         if (match(NUMBER, STRING)) {
             return new Expr.Literal(previous().literal);
+        }
+
+        if (match(IDENTIFIER)) {
+            return new Expr.Variable(previous());
         }
 
         if (match(LEFT_PAREN)) {

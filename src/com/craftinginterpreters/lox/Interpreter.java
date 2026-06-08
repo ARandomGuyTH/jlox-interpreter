@@ -1,6 +1,51 @@
 package com.craftinginterpreters.lox;
 
-class Interpreter implements Expr.Visitor<Object> {
+import java.util.List;
+
+class Interpreter implements Expr.Visitor<Object>,
+        Stmt.Visitor<Void> {
+    private Environment environment = new Environment();
+
+    @Override
+    public Void visitBlockStmt(Stmt.Block stmt) {
+        executeBlock(stmt.statements, new Environment(environment)); //create a new environment for the block's scope
+        return null;
+    }
+
+    void executeBlock(List<Stmt> statements,
+                      Environment environment) {
+        Environment previous = this.environment;
+        try {
+            this.environment = environment;
+
+            for (Stmt statement : statements) {
+                execute(statement); //execute statements in the block's environment
+            }
+        } finally {
+            this.environment = previous; //environment restored even if an error occurs
+        }
+    }
+
+
+    @Override
+    public Object visitAssignExpr(Expr.Assign expr) {
+        Object value = evaluate(expr.value); //evaluate right hand side to get the value
+        environment.assign(expr.name, value); //assign value to variable name
+        return value;
+    }
+
+    @Override
+    public Void visitExpressionStmt(Stmt.Expression stmt) {
+        evaluate(stmt.expression); //evaluate inner expression
+        return null;
+    }
+
+    @Override
+    public Void visitPrintStmt(Stmt.Print stmt) {
+        Object value = evaluate(stmt.expression); //evaluate inner expression
+        System.out.println(stringify(value)); //convert and print inner expression
+        return null;
+    }
 
     //if evaluating a literal we  return the value of the literal
     @Override
@@ -17,6 +62,22 @@ class Interpreter implements Expr.Visitor<Object> {
     // helper method sends expression back into the visitor implementation
     private Object evaluate(Expr expr) {
         return expr.accept(this);
+    }
+
+    @Override
+    public Void visitVarStmt(Stmt.Var stmt) {
+        Object value = null;
+        if (stmt.initializer != null) { //if variable has initializer evaluate it
+            value = evaluate(stmt.initializer);
+        }
+
+        environment.define(stmt.name.lexeme, value);
+        return null;
+    }
+
+    @Override
+    public Object visitVariableExpr(Expr.Variable expr) {
+        return environment.get(expr.name); //forwards variable to enviroment
     }
 
     @Override
@@ -136,11 +197,16 @@ class Interpreter implements Expr.Visitor<Object> {
         return object.toString();
     }
 
+    private void execute(Stmt stmt) {
+        stmt.accept(this);
+    }
 
-    void interpret(Expr expression) { //API takes entire syntax tree as an expression, evaluates it, converts output to string and displays it
+    //API iterates through expressions, evaluating the complete syntax tree for all expressions
+    void interpret(List<Stmt> statements) {
         try {
-            Object value = evaluate(expression);
-            System.out.println(stringify(value));
+            for (Stmt statement : statements) {
+                execute(statement);
+            }
         } catch (RuntimeError error) {
             Lox.runtimeError(error);
         }
