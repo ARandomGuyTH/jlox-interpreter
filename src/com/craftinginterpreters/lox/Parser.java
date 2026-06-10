@@ -19,6 +19,23 @@ class Parser {
         this.tokens = tokens;
     }
 
+    List<Stmt> REPLparse() {
+        List<Stmt> statements = new ArrayList<>();
+        while (!isAtEnd()) { //iterates through all expressions
+            Stmt decleration = declaration();
+
+            if (decleration instanceof Stmt.Expression) { //if the user enters an expression in the repl
+                Expr expressionvalue = ((Stmt.Expression)decleration).expression;
+                decleration = new Stmt.Print(expressionvalue); //treat the expression as syntactic sugar for a print statement surrounding tht]e statement
+            }
+
+            statements.add(decleration); //program is made of declerations grammatically
+        }
+
+        return statements;
+    }
+
+
 
     List<Stmt> parse() {
         List<Stmt> statements = new ArrayList<>();

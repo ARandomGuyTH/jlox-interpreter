@@ -43,9 +43,22 @@ public class Lox {
             System.out.print("> ");
             String line = reader.readLine();
             if (line == null) break; //line == null when ctrl+d inputted
-            run(line);
+            REPLrun(line);
             hadError = false;
         }
+    }
+
+    private static void REPLrun(String source) {
+        Scanner scanner = new Scanner(source);
+        List<Token> tokens = scanner.scanTokens();
+
+        Parser parser = new Parser(tokens);
+        List<Stmt> statements = parser.REPLparse();
+
+        // Stop if there was a syntax error.
+        if (hadError) return;
+
+        interpreter.interpret(statements);
     }
 
     private static void run(String source) {
