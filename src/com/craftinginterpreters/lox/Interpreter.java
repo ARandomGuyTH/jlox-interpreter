@@ -7,6 +7,39 @@ class Interpreter implements Expr.Visitor<Object>,
     private Environment environment = new Environment();
 
     @Override
+    public Void visitWhileStmt(Stmt.While stmt) {
+        while (isTruthy(evaluate(stmt.condition))) { //while the condition is true
+            execute(stmt.body); //repeatedly execute the body of the statement
+        }
+        return null;
+    }
+
+    //note we only evaluate the right value if it is non-determinate from the left
+    //this means that some side effects from the right value may or may not occur depending on the left value
+    @Override
+    public Object visitLogicalExpr(Expr.Logical expr) {
+        Object left = evaluate(expr.left); //evaluate left expression
+
+        if (expr.operator.type == TokenType.OR) { //if or
+            if (isTruthy(left)) return left; //if the left value is true the expression will be true for or
+        } else { //if and
+            if (!isTruthy(left)) return left; //if the left value is false then the expression will be false for and
+        }
+
+        return evaluate(expr.right); //if the value is non-determinate from left we take the right value as the value
+    }
+
+    @Override
+    public Void visitIfStmt(Stmt.If stmt) {
+        if (isTruthy(evaluate(stmt.condition))) { // if truthy we execute the then branch
+            execute(stmt.thenBranch);
+        } else if (stmt.elseBranch != null) { //otherwise, if there is an else branch we execute that
+            execute(stmt.elseBranch);
+        }
+        return null;
+    }
+
+    @Override
     public Void visitBlockStmt(Stmt.Block stmt) {
         executeBlock(stmt.statements, new Environment(environment)); //create a new environment for the block's scope
         return null;

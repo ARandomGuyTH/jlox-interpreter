@@ -1,5 +1,6 @@
 package com.craftinginterpreters.lox;
 
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,11 +30,82 @@ class Parser {
     }
 
     private Stmt statement() {
+        if (match(FOR)) return forStatement();
+        if (match(IF)) return ifStatement(); //statements starting with if token are if (else) statements
         if (match(PRINT)) return printStatement(); //statements starting with a print token are print statements
+        if (match(WHILE)) return whileStatement(); //statements with while token are while statements
         if (match(LEFT_BRACE)) return new Stmt.Block(block()); //statements starting with { are a block statements
 
         return expressionStatement(); //if token does not match any kind of  statement, assume it is an expression statement
     }
+
+    //function will desugar a for loop into a while loop which will be executed by the interpreter
+    private Stmt forStatement() {
+        consume(LEFT_PAREN, "Expect '(' after 'for'."); //check and consume bracket after 'for'
+
+        Stmt initializer; //initialiser is ran once at the start of the for loop
+        if (match(SEMICOLON)) { //no initialiser defined
+            initializer = null;
+        } else if (match(VAR)) { //initialiser is a var decleration i.e var i = 0;
+            initializer = varDeclaration();
+        } else { //if neither initialiser must be an expression statement
+            initializer = expressionStatement();
+        }
+
+        Expr condition = null; //condition must be true at the start of every iteration to continue iterating
+        if (!check(SEMICOLON)) {
+            condition = expression();
+        }
+        consume(SEMICOLON, "Expect ';' after loop condition.");
+
+        Expr increment = null; //increment is ran at the start of every iteration
+        if (!check(RIGHT_PAREN)) {
+            increment = expression();
+        }
+        consume(RIGHT_PAREN, "Expect ')' after for clauses.");
+        Stmt body = statement();
+
+        if (increment != null) { //if there is an increment
+            body = new Stmt.Block( //we replace the body by a block that contains the og body followed by an expression that evaluates the increment
+                    Arrays.asList(
+                            body,
+                            new Stmt.Expression(increment)));
+        }
+
+        if (condition == null) condition = new Expr.Literal(true); // if just ';' we take that to mean an infinite loop
+        body = new Stmt.While(condition, body); //use the condition to create a while loop
+
+        if (initializer != null) { //if an initialiser is defined
+            body = new Stmt.Block(Arrays.asList(initializer, body)); //we wrap the while loop in another block that runs the initialiser once and then the while loop
+        }
+
+        return body;
+    }
+
+
+    private Stmt whileStatement() {
+        consume(LEFT_PAREN, "Expect '(' after 'while'.");//condition in brackets
+        Expr condition = expression();
+        consume(RIGHT_PAREN, "Expect ')' after condition.");
+        Stmt body = statement();
+
+        return new Stmt.While(condition, body);
+    }
+
+    private Stmt ifStatement() {
+        consume(LEFT_PAREN, "Expect '(' after 'if'."); //condition must be inside brackets
+        Expr condition = expression();
+        consume(RIGHT_PAREN, "Expect ')' after if condition.");
+
+        Stmt thenBranch = statement();
+        Stmt elseBranch = null; //if no else token appears then we the elsebranch field is stored as null in the syntax tree
+        if (match(ELSE)) { //if else token appears then we store the else statement
+            elseBranch = statement();
+        }
+
+        return new Stmt.If(condition, thenBranch, elseBranch);
+    }
+
 
     private List<Stmt> block() {
         List<Stmt> statements = new ArrayList<>();
@@ -64,7 +136,7 @@ class Parser {
     }
 
     private Expr assignment() {
-        Expr expr = equality();
+        Expr expr = or();
 
         if (match(EQUAL)) {
             Token equals = previous();
@@ -76,6 +148,30 @@ class Parser {
             }
 
             error(equals, "Invalid assignment target."); //don't throw as we don't need to synchronise due to this error
+        }
+
+        return expr;
+    }
+
+    private Expr or() {
+        Expr expr = and();
+
+        while (match(OR)) {
+            Token operator = previous();
+            Expr right = and();
+            expr = new Expr.Logical(expr, operator, right);
+        }
+
+        return expr;
+    }
+
+    private Expr and() {
+        Expr expr = equality();
+
+        while (match(AND)) {
+            Token operator = previous();
+            Expr right = equality();
+            expr = new Expr.Logical(expr, operator, right);
         }
 
         return expr;
