@@ -15,6 +15,8 @@ class Parser {
     private final List<Token> tokens;
     private int current = 0;
 
+    private int loopLevel = 0;
+
     Parser(List<Token> tokens) {
         this.tokens = tokens;
     }
@@ -35,8 +37,6 @@ class Parser {
         return statements;
     }
 
-
-
     List<Stmt> parse() {
         List<Stmt> statements = new ArrayList<>();
         while (!isAtEnd()) { //iterates through all expressions
@@ -48,12 +48,19 @@ class Parser {
 
     private Stmt statement() {
         if (match(FOR)) return forStatement();
+        if (match(BREAK)) return breakStatement();
         if (match(IF)) return ifStatement(); //statements starting with if token are if (else) statements
         if (match(PRINT)) return printStatement(); //statements starting with a print token are print statements
         if (match(WHILE)) return whileStatement(); //statements with while token are while statements
         if (match(LEFT_BRACE)) return new Stmt.Block(block()); //statements starting with { are a block statements
 
         return expressionStatement(); //if token does not match any kind of  statement, assume it is an expression statement
+    }
+
+    private Stmt breakStatement() {
+        consume(SEMICOLON, "Expect ';' after break.");
+        if (loopLevel == 0) throw error(previous(), "break must be inside loop.");
+        return new Stmt.Break();
     }
 
     //function will desugar a for loop into a while loop which will be executed by the interpreter
@@ -79,6 +86,8 @@ class Parser {
         if (!check(RIGHT_PAREN)) {
             increment = expression();
         }
+
+        loopLevel++;
         consume(RIGHT_PAREN, "Expect ')' after for clauses.");
         Stmt body = statement();
 
@@ -96,6 +105,7 @@ class Parser {
             body = new Stmt.Block(Arrays.asList(initializer, body)); //we wrap the while loop in another block that runs the initialiser once and then the while loop
         }
 
+        loopLevel--;
         return body;
     }
 
@@ -104,7 +114,9 @@ class Parser {
         consume(LEFT_PAREN, "Expect '(' after 'while'.");//condition in brackets
         Expr condition = expression();
         consume(RIGHT_PAREN, "Expect ')' after condition.");
+        loopLevel++;
         Stmt body = statement();
+        loopLevel--;
 
         return new Stmt.While(condition, body);
     }
@@ -266,6 +278,7 @@ class Parser {
     }
 
     private ParseError error(Token token, String message) {
+        loopLevel = 0;
         Lox.error(token, message);
         return new ParseError();
     }

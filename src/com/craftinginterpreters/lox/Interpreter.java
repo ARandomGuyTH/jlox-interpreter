@@ -6,10 +6,21 @@ class Interpreter implements Expr.Visitor<Object>,
         Stmt.Visitor<Void> {
     private Environment environment = new Environment();
 
+    private static class BreakException extends RuntimeException {}
+
+    @Override
+    public Void visitBreakStmt(Stmt.Break stmt) {
+        throw new BreakException(); //break throws an exception which will get caught by the while code
+    }
+
     @Override
     public Void visitWhileStmt(Stmt.While stmt) {
-        while (isTruthy(evaluate(stmt.condition))) { //while the condition is true
-            execute(stmt.body); //repeatedly execute the body of the statement
+        try {
+            while (isTruthy(evaluate(stmt.condition))) { //while the condition is true
+                execute(stmt.body); //repeatedly execute the body of the statement
+            }
+        } catch (BreakException exception) {
+            return null;  //Break exception exits the while loop
         }
         return null;
     }
