@@ -51,10 +51,22 @@ class Parser {
         if (match(BREAK)) return breakStatement();
         if (match(IF)) return ifStatement(); //statements starting with if token are if (else) statements
         if (match(PRINT)) return printStatement(); //statements starting with a print token are print statements
+        if (match(RETURN)) return returnStatement();
         if (match(WHILE)) return whileStatement(); //statements with while token are while statements
         if (match(LEFT_BRACE)) return new Stmt.Block(block()); //statements starting with { are a block statements
 
         return expressionStatement(); //if token does not match any kind of  statement, assume it is an expression statement
+    }
+
+    private Stmt returnStatement() {
+        Token keyword = previous();
+        Expr value = null;
+        if (!check(SEMICOLON)) { //if a semicolon isnt present then the next expression is the return value
+            value = expression();
+        }
+
+        consume(SEMICOLON, "Expect ';' after return value.");
+        return new Stmt.Return(keyword, value);
     }
 
     private Stmt breakStatement() {
@@ -209,6 +221,7 @@ class Parser {
     //gramatically declerations are made of var decl., func decl, object decl and statements
     private Stmt declaration() {
         try {
+            if (match(FUN)) return function("function");
             if (match(VAR)) return varDeclaration();
 
             return statement(); //if no keywords then falls through to statement
@@ -217,6 +230,29 @@ class Parser {
             return null;
         }
     }
+
+    private Stmt.Function function(String kind) {
+        Token name = consume(IDENTIFIER, "Expect " + kind + " name.");
+        consume(LEFT_PAREN, "Expect '(' after " + kind + " name.");
+        List<Token> parameters = new ArrayList<>();
+        if (!check(RIGHT_PAREN)) { //if there is parameters
+            do { //while we have commas parse the parameters and add them to the parameters array
+                if (parameters.size() >= 255) {
+                    error(peek(), "Can't have more than 255 parameters.");
+                }
+
+                parameters.add(
+                        consume(IDENTIFIER, "Expect parameter name."));
+            } while (match(COMMA));
+        }
+        consume(RIGHT_PAREN, "Expect ')' after parameters.");
+
+        consume(LEFT_BRACE, "Expect '{' before " + kind + " body.");
+        List<Stmt> body = block(); //parse body
+        return new Stmt.Function(name, parameters, body);
+
+    }
+
 
     private Stmt varDeclaration() {
         Token name = consume(IDENTIFIER, "Expect variable name.");
@@ -344,11 +380,43 @@ class Parser {
     private Expr unary() {
         if (match(BANG, MINUS)) {
             Token operator = previous();
-            Expr right = unary();
+            Expr right = unary(); //loop until a call or primary is reached
             return new Expr.Unary(operator, right);
         }
 
-        return primary(); //primary only called after loop as there is no left value only right
+        return call(); //call only called after loop as there is no left value only right
+    }
+
+    private Expr call() {
+        Expr expr = primary();
+
+        while (true) { //code loops until
+            if (match(LEFT_PAREN)) {
+                expr = finishCall(expr);
+            } else { //no matching call token is found
+                break;
+            }
+        }
+
+        return expr;
+    }
+
+    //handles the arguments
+    private Expr finishCall(Expr callee) {
+        List<Expr> arguments = new ArrayList<>();
+        if (!check(RIGHT_PAREN)) { //if the next token isn't a ')'
+            do {
+                if (arguments.size() >= 255) { // a Lox function can have no more then 255 arguments
+                    error(peek(), "Can't have more than 255 arguments.");
+                }
+                arguments.add(expression()); //keep adding arguments
+            } while (match(COMMA)); //while ',' is found after the argument
+        }
+
+        Token paren = consume(RIGHT_PAREN,
+                "Expect ')' after arguments.");
+
+        return new Expr.Call(callee, paren, arguments);
     }
 
     private Expr primary() {

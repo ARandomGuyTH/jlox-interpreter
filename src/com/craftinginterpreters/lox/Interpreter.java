@@ -1,12 +1,71 @@
 package com.craftinginterpreters.lox;
 
+import java.util.ArrayList;
 import java.util.List;
 
 class Interpreter implements Expr.Visitor<Object>,
         Stmt.Visitor<Void> {
-    private Environment environment = new Environment();
+    final Environment globals = new Environment(); //global field holds a fixed reference to the outermost environment
+
+    Interpreter() { // add native functions here
+        globals.define("clock", new LoxCallable() { //defines clock variable
+            @Override
+            public int arity() { return 0; }
+
+            @Override
+            public Object call(Interpreter interpreter,
+                               List<Object> arguments) {
+                return (double)System.currentTimeMillis() / 1000.0; //calls the corrisponding Java function and converts to seconds
+            }
+
+            @Override
+            public String toString() { return "<native fn>"; }
+        });
+    }
+
+    private Environment environment = globals;
 
     private static class BreakException extends RuntimeException {}
+
+    @Override
+    public Void visitReturnStmt(Stmt.Return stmt) {
+        Object value = null;
+        if (stmt.value != null) value = evaluate(stmt.value); //if we have a return value return it
+        //otherwise we return nill
+        throw new Return(value); //wrap the return value in a custom exception class
+    }
+
+    @Override
+    public Void visitFunctionStmt(Stmt.Function stmt) {
+        LoxFunction function = new LoxFunction(stmt, environment); //capture current environment when declaring the function
+        environment.define(stmt.name.lexeme, function); //add the function to the environment
+        return null;
+    }
+
+
+    @Override
+    public Object visitCallExpr(Expr.Call expr) {
+        Object callee = evaluate(expr.callee); //evaluate the callee
+
+        List<Object> arguments = new ArrayList<>();
+        for (Expr argument : expr.arguments) {
+            arguments.add(evaluate(argument)); //evaluate all expressions in order and add them to a list
+        }
+
+        if (!(callee instanceof LoxCallable)) { //in case the callee is not valid like calling a strin i.e - "not a function"();
+            throw new RuntimeError(expr.paren,
+                    "Can only call functions and classes."); //we will throw our own error so the interpretter can catch and report it
+        }
+
+        LoxCallable function = (LoxCallable)callee; //cast the callee as lox callable to invoke the call method on it
+        if (arguments.size() != function.arity()) { //if the number of arguments does not match the expected number of arguments
+            throw new RuntimeError(expr.paren, "Expected " +
+                    function.arity() + " arguments but got " +
+                    arguments.size() + "."); //we throw an error before invoking the callable
+        }
+
+        return function.call(this, arguments);
+    }
 
     @Override
     public Void visitBreakStmt(Stmt.Break stmt) {
