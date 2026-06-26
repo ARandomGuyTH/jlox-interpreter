@@ -1,11 +1,14 @@
 package com.craftinginterpreters.lox;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 
 class Interpreter implements Expr.Visitor<Object>,
         Stmt.Visitor<Void> {
     final Environment globals = new Environment(); //global field holds a fixed reference to the outermost environment
+    private final Map<Expr, Integer> locals = new HashMap<>();
 
     Interpreter() { // add native functions here
         globals.define("clock", new LoxCallable() { //defines clock variable
@@ -26,6 +29,10 @@ class Interpreter implements Expr.Visitor<Object>,
     private Environment environment = globals;
 
     private static class BreakException extends RuntimeException {}
+
+    void resolve(Expr expr, int depth) { //tracks the number of environments from the current to find a variable's value
+        locals.put(expr, depth);
+    }
 
     @Override
     public Void visitReturnStmt(Stmt.Return stmt) {
@@ -133,7 +140,14 @@ class Interpreter implements Expr.Visitor<Object>,
     @Override
     public Object visitAssignExpr(Expr.Assign expr) {
         Object value = evaluate(expr.value); //evaluate right hand side to get the value
-        environment.assign(expr.name, value); //assign value to variable name
+
+        Integer distance = locals.get(expr);
+        if (distance != null) {
+            environment.assignAt(distance, expr.name, value); //assign the variable to it's name
+        } else {
+            globals.assign(expr.name, value);
+        }
+
         return value;
     }
 
@@ -180,7 +194,16 @@ class Interpreter implements Expr.Visitor<Object>,
 
     @Override
     public Object visitVariableExpr(Expr.Variable expr) {
-        return environment.get(expr.name); //forwards variable to enviroment
+        return lookUpVariable(expr.name, expr);
+    }
+
+    private Object lookUpVariable(Token name, Expr expr) {
+        Integer distance = locals.get(expr); //get resolved distance
+        if (distance != null) {
+            return environment.getAt(distance, name.lexeme); //get the value
+        } else { //if does not appear in the map it must be a global var
+            return globals.get(name);
+        }
     }
 
     @Override

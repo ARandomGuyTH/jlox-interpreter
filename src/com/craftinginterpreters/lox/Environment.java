@@ -16,6 +16,22 @@ class Environment {
         this.enclosing = enclosing;
     }
 
+    Environment ancestor(int distance) { //returns the environment 'distance' number of enclosures away
+        Environment environment = this;
+        for (int i = 0; i < distance; i++) {
+            environment = environment.enclosing;
+        }
+
+        return environment;
+    }
+
+    void assignAt(int distance, Token name, Object value) {
+        ancestor(distance).values.put(name.lexeme, value);
+    }
+
+    Object getAt(int distance, String name) {
+        return ancestor(distance).values.get(name);
+    }
 
     //binds a name to a value
     void define(String name, Object value) {
