@@ -16,8 +16,17 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
 
     private enum FunctionType {
         NONE,
-        FUNCTION
+        FUNCTION,
+        INITIALIZER,
+        METHOD
     }
+
+    private enum ClassType {
+        NONE,
+        CLASS
+    }
+
+    private ClassType currentClass = ClassType.NONE;
 
     void resolve(List<Stmt> statements) {
         for (Stmt statement : statements) { //walks a list of statements resolving each one
@@ -89,6 +98,45 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     }
 
     @Override
+    public Void visitClassStmt(Stmt.Class stmt) {
+        ClassType enclosingClass = currentClass; //store previous value of current class
+        currentClass = ClassType.CLASS; //update currentclass to show we are inside a class
+
+        declare(stmt.name);
+        define(stmt.name);
+
+        beginScope();
+        scopes.peek().put("this", true); //declare 'this' in scope just outside method body
+
+        for (Stmt.Function method : stmt.methods) { //iterate through methods
+            FunctionType declaration = FunctionType.METHOD;
+            if (method.name.lexeme.equals("init")) {
+                declaration = FunctionType.INITIALIZER; //update to show we are inside an intializer
+            }
+            resolveFunction(method, declaration); //resolve each method
+        }
+
+        endScope();
+
+        currentClass = enclosingClass; //return to old value
+
+        return null;
+    }
+
+    @Override
+    public Void visitThisExpr(Expr.This expr) {
+        if (currentClass == ClassType.NONE) { //'this' can only be used inside a class
+            Lox.error(expr.keyword,
+                    "Can't use 'this' outside of a class.");
+            return null;
+        }
+        resolveLocal(expr, expr.keyword); //resolve like a variable using this as the keyword
+        return null;
+    }
+
+
+
+    @Override
     public Void visitVarStmt(Stmt.Var stmt) { //we split var into two steps - declaring the variable then defining
         declare(stmt.name);
         if (stmt.initializer != null) {
@@ -97,6 +145,7 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         define(stmt.name);
         return null;
     }
+
 
     @Override
     public Void visitVariableExpr(Expr.Variable expr) {
@@ -154,6 +203,10 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
 
 
         if (stmt.value != null) {
+            if (currentFunction == FunctionType.INITIALIZER) { //can't return inside an initializer
+                Lox.error(stmt.keyword,
+                        "Can't return a value from an initializer.");
+            }
             resolve(stmt.value);
         }
 
@@ -191,6 +244,12 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     }
 
     @Override
+    public Void visitGetExpr(Expr.Get expr) {
+        resolve(expr.object);
+        return null;
+    }
+
+    @Override
     public Void visitGroupingExpr(Expr.Grouping expr) {
         resolve(expr.expression);
         return null;
@@ -205,6 +264,13 @@ class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     public Void visitLogicalExpr(Expr.Logical expr) {
         resolve(expr.left); //resolve both expressions
         resolve(expr.right);
+        return null;
+    }
+
+    @Override
+    public Void visitSetExpr(Expr.Set expr) {
+        resolve(expr.value);
+        resolve(expr.object);
         return null;
     }
 

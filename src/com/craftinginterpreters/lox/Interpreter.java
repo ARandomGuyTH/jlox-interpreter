@@ -44,7 +44,7 @@ class Interpreter implements Expr.Visitor<Object>,
 
     @Override
     public Void visitFunctionStmt(Stmt.Function stmt) {
-        LoxFunction function = new LoxFunction(stmt, environment); //capture current environment when declaring the function
+        LoxFunction function = new LoxFunction(stmt, environment,false);
         environment.define(stmt.name.lexeme, function); //add the function to the environment
         return null;
     }
@@ -72,6 +72,31 @@ class Interpreter implements Expr.Visitor<Object>,
         }
 
         return function.call(this, arguments);
+    }
+
+    @Override
+    public Object visitGetExpr(Expr.Get expr) {
+        Object object = evaluate(expr.object);
+        if (object instanceof LoxInstance) { //if the object is an instance of a class
+            return ((LoxInstance) object).get(expr.name);//we ask the instance for the property
+        }
+
+        throw new RuntimeError(expr.name,
+                "Only instances have properties.");
+    }
+
+    @Override
+    public Object visitSetExpr(Expr.Set expr) {
+        Object object = evaluate(expr.object);
+
+        if (!(object instanceof LoxInstance)) {
+            throw new RuntimeError(expr.name,
+                    "Only instances have fields.");
+        }
+
+        Object value = evaluate(expr.value); //evaluate the value being set
+        ((LoxInstance)object).set(expr.name, value); //set attribute to this value
+        return value;
     }
 
     @Override
@@ -120,6 +145,27 @@ class Interpreter implements Expr.Visitor<Object>,
     public Void visitBlockStmt(Stmt.Block stmt) {
         executeBlock(stmt.statements, new Environment(environment)); //create a new environment for the block's scope
         return null;
+    }
+
+    @Override
+    public Void visitClassStmt(Stmt.Class stmt) {
+        environment.define(stmt.name.lexeme, null); //declare class name in current environment
+        // (done before runtime representation so class can be referenced in it's methods)
+
+        Map<String, LoxFunction> methods = new HashMap<>();
+        for (Stmt.Function method : stmt.methods) {
+            LoxFunction function = new LoxFunction(method, environment, method.name.lexeme.equals("init"));
+            methods.put(method.name.lexeme, function); //wrap methods in map
+        }
+
+        LoxClass klass = new LoxClass(stmt.name.lexeme, methods); //create LoxClass from methods and class AST node
+        environment.assign(stmt.name, klass); //store
+        return null;
+    }
+
+    @Override
+    public Object visitThisExpr(Expr.This expr) { //same as interpretting a variable statement
+        return lookUpVariable(expr.keyword, expr);
     }
 
     void executeBlock(List<Stmt> statements,

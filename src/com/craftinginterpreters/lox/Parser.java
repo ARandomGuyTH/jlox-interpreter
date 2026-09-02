@@ -186,9 +186,12 @@ class Parser {
             if (expr instanceof Expr.Variable) { //if a valid variable target is found we produce a syntax tree that turns the "expression" into an assignment target
                 Token name = ((Expr.Variable)expr).name;
                 return new Expr.Assign(name, value);
+            }  else if (expr instanceof Expr.Get) {
+                Expr.Get get = (Expr.Get) expr;
+                return new Expr.Set(get.object, get.name, value);
             }
 
-            error(equals, "Invalid assignment target."); //don't throw as we don't need to synchronise due to this error
+                error(equals, "Invalid assignment target."); //don't throw as we don't need to synchronise due to this error
         }
 
         return expr;
@@ -221,6 +224,7 @@ class Parser {
     //gramatically declerations are made of var decl., func decl, object decl and statements
     private Stmt declaration() {
         try {
+            if (match(CLASS)) return classDeclaration();
             if (match(FUN)) return function("function");
             if (match(VAR)) return varDeclaration();
 
@@ -229,6 +233,20 @@ class Parser {
             synchronize();
             return null;
         }
+    }
+
+    private Stmt classDeclaration() {
+        Token name = consume(IDENTIFIER, "Expect class name.");
+        consume(LEFT_BRACE, "Expect '{' before class body.");
+
+        List<Stmt.Function> methods = new ArrayList<>();
+        while (!check(RIGHT_BRACE) && !isAtEnd()) { //keep parsing method declerations until we hit closing brace
+            methods.add(function("method"));
+        }
+
+        consume(RIGHT_BRACE, "Expect '}' after class body.");
+
+        return new Stmt.Class(name, methods);
     }
 
     private Stmt.Function function(String kind) {
@@ -390,10 +408,14 @@ class Parser {
     private Expr call() {
         Expr expr = primary();
 
-        while (true) { //code loops until
+        while (true) { //code loops until no matching call token is found
             if (match(LEFT_PAREN)) {
                 expr = finishCall(expr);
-            } else { //no matching call token is found
+            }   else if (match(DOT)) {
+            Token name = consume(IDENTIFIER,
+                    "Expect property name after '.'.");
+            expr = new Expr.Get(expr, name);
+        } else {
                 break;
             }
         }
@@ -427,6 +449,8 @@ class Parser {
         if (match(NUMBER, STRING)) {
             return new Expr.Literal(previous().literal);
         }
+
+        if (match(THIS)) return new Expr.This(previous());
 
         if (match(IDENTIFIER)) {
             return new Expr.Variable(previous());
