@@ -3,11 +3,12 @@ package com.craftinginterpreters.lox;
 import java.util.List;
 import java.util.Map;
 
-class LoxClass implements LoxCallable { //calling a Lox class is used to create a new instance of the class
+class LoxClass extends LoxInstance implements LoxCallable { //calling a Lox class is used to create a new instance of the class
     final String name;
     private final Map<String, LoxFunction> methods;
 
-    LoxClass(String name, Map<String, LoxFunction> methods) {
+    LoxClass(String name, Map<String, LoxFunction> methods, LoxClass metaklass) {
+        super(metaklass); //every class instance is an instance of a metaclass
         this.name = name;
         this.methods = methods; //methods stored in class but accessed through instances
     }

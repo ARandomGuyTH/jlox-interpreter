@@ -1,8 +1,25 @@
-class Foo {
-  init() {
+class Math {
+  class square(n) {
+    return n * n;
+  }
+  foo(a, b, c) {
+    return a + b + c;
+  }
+  class cube(n) {
+    return n*n*n;
+  }
+  class printClass(){
     print this;
   }
 }
 
-var foo = Foo();
-print foo.init();
+class Math2 {
+    class square2(n) {
+        return n*n;
+    }
+}
+
+print Math.square(3); // Prints "9".
+print Math2.square2(3);
+Math.printClass();
+Math2.square(3);

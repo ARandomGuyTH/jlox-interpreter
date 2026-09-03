@@ -240,13 +240,20 @@ class Parser {
         consume(LEFT_BRACE, "Expect '{' before class body.");
 
         List<Stmt.Function> methods = new ArrayList<>();
+        List<Stmt.Function> statics = new ArrayList<>();
+
         while (!check(RIGHT_BRACE) && !isAtEnd()) { //keep parsing method declerations until we hit closing brace
-            methods.add(function("method"));
+            if (match(CLASS)) {
+                statics.add(function("method"));
+            }
+            else {
+                methods.add(function("method"));
+            }
         }
 
         consume(RIGHT_BRACE, "Expect '}' after class body.");
 
-        return new Stmt.Class(name, methods);
+        return new Stmt.Class(name, methods, statics);
     }
 
     private Stmt.Function function(String kind) {

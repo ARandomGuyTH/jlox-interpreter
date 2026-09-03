@@ -152,13 +152,21 @@ class Interpreter implements Expr.Visitor<Object>,
         environment.define(stmt.name.lexeme, null); //declare class name in current environment
         // (done before runtime representation so class can be referenced in it's methods)
 
+        Map<String, LoxFunction> statics = new HashMap<>();
+        for (Stmt.Function method : stmt.statics) {
+            LoxFunction function = new LoxFunction(method, environment, false);
+            statics.put(method.name.lexeme, function);
+        }
+
+        LoxClass metaklass = new LoxClass(stmt.name.lexeme + "metaClass", statics, null);
+
         Map<String, LoxFunction> methods = new HashMap<>();
         for (Stmt.Function method : stmt.methods) {
             LoxFunction function = new LoxFunction(method, environment, method.name.lexeme.equals("init"));
             methods.put(method.name.lexeme, function); //wrap methods in map
         }
 
-        LoxClass klass = new LoxClass(stmt.name.lexeme, methods); //create LoxClass from methods and class AST node
+        LoxClass klass = new LoxClass(stmt.name.lexeme, methods, metaklass); //create LoxClass from methods and class AST node
         environment.assign(stmt.name, klass); //store
         return null;
     }
