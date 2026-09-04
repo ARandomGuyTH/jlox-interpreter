@@ -5,17 +5,23 @@ import java.util.Map;
 
 class LoxClass extends LoxInstance implements LoxCallable { //calling a Lox class is used to create a new instance of the class
     final String name;
+    final LoxClass superclass;
     private final Map<String, LoxFunction> methods;
 
-    LoxClass(String name, Map<String, LoxFunction> methods, LoxClass metaklass) {
+    LoxClass(String name, LoxClass superclass, Map<String, LoxFunction> methods, LoxClass metaklass) {
         super(metaklass); //every class instance is an instance of a metaclass
+        this.superclass = superclass;
         this.name = name;
         this.methods = methods; //methods stored in class but accessed through instances
     }
 
     LoxFunction findMethod(String name) {
-        if (methods.containsKey(name)) {
+        if (methods.containsKey(name)) { //current subclass searched before super
             return methods.get(name);
+        }
+
+        if (superclass != null) { //recurse up parent classes until found
+            return superclass.findMethod(name);
         }
 
         return null;
