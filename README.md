@@ -9,14 +9,16 @@ Finally, the interpreter then travels down the resolved tree executing the code 
 ## Features
 Lox is a dynamic high-level language that supports the following:  
   -Basic arithmetic (+, -, *, /)  
-  -Booleans, numbers, strings and nil data types  
+  -Boolean, numbers, strings and nil data types  
   -comparison operations  
   -logical operations  
   -print statements  
   -variables  
-  -control flow  
+  -String concatenation  
+  -control flow (if, else, break, return)  
+  -comments (single and multi-line)
   -functions (including local)  
-  -Classes (with initialization and inheritance)  
+  -Classes (with initialization, static methods and inheritance)  
 
 ## To add
 The language would need the following to be useful:  
@@ -24,7 +26,7 @@ The language would need the following to be useful:
   -file manipulation  
   -string manipulation  
   -collections (arrays, lists, maps, etc)  
-  -a math library (trig, squareroot, etc)  
+  -a math library (trig, square root, etc)  
 
 ## Credits  
 This project was made alongside reading the Crafting Interpreters book by Robert Nystrom  
