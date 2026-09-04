@@ -1,25 +1,13 @@
-class Math {
-  class square(n) {
-    return n * n;
-  }
-  foo(a, b, c) {
-    return a + b + c;
-  }
-  class cube(n) {
-    return n*n*n;
-  }
-  class printClass(){
-    print this;
+class Doughnut {
+  cook() {
+    return "Fry until golden brown.";
   }
 }
 
-class Math2 {
-    class square2(n) {
-        return n*n;
-    }
+class BostonCream < Doughnut {
+  cook() {
+    print "Pipe full of custard and coat with chocolate." + super.cook();
+  }
 }
 
-print Math.square(3); // Prints "9".
-print Math2.square2(3);
-Math.printClass();
-Math2.square(3);
+BostonCream().cook();
